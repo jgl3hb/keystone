@@ -1,184 +1,211 @@
 import * as THREE from 'three';
 
 /**
- * Generates pine trees across the terrain using instanced meshes for performance
+ * Generates dense pine forest matching the trail map reference.
+ * Trees should create dark green/blue-green masses with visible individual tree texture.
  */
 export class TreeGenerator {
     constructor(terrainGenerator) {
         this.terrain = terrainGenerator;
-        this.treeLineElevation = 220; // ~11,500 ft - above this, no trees
-        this.minElevation = 20;       // Below base area
+        this.treeLineElevation = 260;  // Above this, no trees
+        this.minElevation = 15;        // Below base, no trees
     }
 
-    /**
-     * Generate all trees as instanced meshes
-     */
     generate() {
         const group = new THREE.Group();
         group.name = 'trees';
 
-        // Create tree geometry (simple cone + cylinder)
-        const treeGeometry = this.createTreeGeometry();
-
-        // Create material
-        const treeMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a4a1a,
-            roughness: 0.9,
-            flatShading: true
-        });
-
         // Generate tree positions
         const positions = this.generateTreePositions();
 
-        // Create instanced mesh
-        const instancedMesh = new THREE.InstancedMesh(
-            treeGeometry,
-            treeMaterial,
-            positions.length
-        );
-        instancedMesh.castShadow = true;
-        instancedMesh.receiveShadow = true;
+        // Create multiple tree types for variety
+        const treeTypes = [
+            this.createPineTree(0x1a3d2e, 1.0),   // Dark blue-green
+            this.createPineTree(0x1f4a38, 0.9),   // Slightly lighter
+            this.createPineTree(0x164030, 1.1),   // Darker, taller
+            this.createPineTree(0x234d3a, 0.85),  // Medium
+        ];
 
-        // Position each tree
-        const matrix = new THREE.Matrix4();
-        const position = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
+        // Create instanced meshes for each tree type
+        const treesPerType = Math.ceil(positions.length / treeTypes.length);
 
-        for (let i = 0; i < positions.length; i++) {
-            const p = positions[i];
-            position.set(p.x, p.y, p.z);
+        treeTypes.forEach((treeGeo, typeIndex) => {
+            const material = new THREE.MeshStandardMaterial({
+                color: treeGeo.color,
+                roughness: 0.95,
+                flatShading: true
+            });
 
-            // Random rotation around Y
-            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
+            const startIdx = typeIndex * treesPerType;
+            const endIdx = Math.min(startIdx + treesPerType, positions.length);
+            const count = endIdx - startIdx;
 
-            // Random scale variation
-            const s = 0.7 + Math.random() * 0.6;
-            scale.set(s, s * (0.8 + Math.random() * 0.4), s);
+            if (count <= 0) return;
 
-            matrix.compose(position, quaternion, scale);
-            instancedMesh.setMatrixAt(i, matrix);
-        }
+            const instancedMesh = new THREE.InstancedMesh(
+                treeGeo.geometry,
+                material,
+                count
+            );
+            instancedMesh.castShadow = true;
+            instancedMesh.receiveShadow = true;
 
-        instancedMesh.instanceMatrix.needsUpdate = true;
-        group.add(instancedMesh);
+            const matrix = new THREE.Matrix4();
+            const position = new THREE.Vector3();
+            const quaternion = new THREE.Quaternion();
+            const scale = new THREE.Vector3();
 
+            for (let i = 0; i < count; i++) {
+                const p = positions[startIdx + i];
+                position.set(p.x, p.y, p.z);
+
+                // Random rotation
+                quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
+
+                // Scale based on elevation (smaller trees higher up)
+                const elevationFactor = 1.0 - (p.y / this.treeLineElevation) * 0.3;
+                const baseScale = (0.6 + Math.random() * 0.5) * treeGeo.scaleFactor * elevationFactor;
+                scale.set(baseScale, baseScale * (0.9 + Math.random() * 0.3), baseScale);
+
+                matrix.compose(position, quaternion, scale);
+                instancedMesh.setMatrixAt(i, matrix);
+            }
+
+            instancedMesh.instanceMatrix.needsUpdate = true;
+            group.add(instancedMesh);
+        });
+
+        console.log(`Generated ${positions.length} trees`);
         return group;
     }
 
     /**
-     * Create a simple pine tree geometry
+     * Create a more detailed pine tree geometry
      */
-    createTreeGeometry() {
-        const group = new THREE.Group();
+    createPineTree(color, scaleFactor) {
+        // Multi-layer cone for fuller pine tree shape
+        const geometry = new THREE.BufferGeometry();
 
-        // Trunk
-        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.8, 4, 6);
-        trunkGeometry.translate(0, 2, 0);
+        // Create 3 stacked cones for the foliage
+        const cone1 = new THREE.ConeGeometry(3.5, 7, 6);
+        const cone2 = new THREE.ConeGeometry(2.8, 5.5, 6);
+        const cone3 = new THREE.ConeGeometry(2.0, 4, 6);
 
-        // Foliage layers (3 cones stacked)
-        const foliage1 = new THREE.ConeGeometry(4, 8, 6);
-        foliage1.translate(0, 10, 0);
-
-        const foliage2 = new THREE.ConeGeometry(3.5, 6, 6);
-        foliage2.translate(0, 14, 0);
-
-        const foliage3 = new THREE.ConeGeometry(2.5, 5, 6);
-        foliage3.translate(0, 17, 0);
+        // Position cones
+        cone1.translate(0, 6, 0);
+        cone2.translate(0, 10, 0);
+        cone3.translate(0, 13, 0);
 
         // Merge geometries
-        const mergedGeometry = new THREE.BufferGeometry();
+        const mergedPositions = [];
+        const mergedNormals = [];
 
-        // For simplicity, just use one cone for the tree
-        const treeGeometry = new THREE.ConeGeometry(3, 12, 6);
-        treeGeometry.translate(0, 8, 0);
+        [cone1, cone2, cone3].forEach(cone => {
+            const pos = cone.attributes.position.array;
+            const norm = cone.attributes.normal.array;
+            for (let i = 0; i < pos.length; i++) {
+                mergedPositions.push(pos[i]);
+            }
+            for (let i = 0; i < norm.length; i++) {
+                mergedNormals.push(norm[i]);
+            }
+        });
 
-        return treeGeometry;
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(mergedPositions, 3));
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(mergedNormals, 3));
+
+        return { geometry, color, scaleFactor };
     }
 
     /**
-     * Generate positions for trees across the terrain
+     * Generate dense tree positions avoiding ski runs
      */
     generateTreePositions() {
         const positions = [];
         const terrain = this.terrain;
 
-        // Grid-based placement with jitter
-        const spacing = 25;
-        const jitter = 10;
+        // Denser spacing for more realistic forest
+        const baseSpacing = 18;
+        const jitter = 8;
 
         const halfWidth = terrain.width / 2;
         const halfDepth = terrain.depth / 2;
 
-        // Define ski run corridors to avoid (simplified boxes)
+        // Get ski run corridors
         const runCorridors = this.getRunCorridors();
 
-        for (let x = -halfWidth + spacing; x < halfWidth - spacing; x += spacing) {
-            for (let z = -halfDepth + spacing; z < halfDepth - spacing; z += spacing) {
-                // Add random jitter
-                const jx = x + (Math.random() - 0.5) * jitter * 2;
-                const jz = z + (Math.random() - 0.5) * jitter * 2;
+        for (let x = -halfWidth + baseSpacing; x < halfWidth - baseSpacing; x += baseSpacing) {
+            for (let z = -halfDepth + baseSpacing; z < halfDepth - baseSpacing; z += baseSpacing) {
+                // Multiple trees per cell for density
+                const treesInCell = 1 + Math.floor(Math.random() * 2);
 
-                // Get terrain height
-                const height = terrain.getHeightAt(jx, jz);
+                for (let t = 0; t < treesInCell; t++) {
+                    const jx = x + (Math.random() - 0.5) * jitter * 2;
+                    const jz = z + (Math.random() - 0.5) * jitter * 2;
 
-                // Skip if above tree line or too low
-                if (height > this.treeLineElevation || height < this.minElevation) {
-                    continue;
-                }
+                    const height = terrain.getHeightAt(jx, jz);
 
-                // Skip if in a ski run corridor
-                if (this.isInRunCorridor(jx, jz, runCorridors)) {
-                    continue;
-                }
+                    // Skip if above tree line or too low
+                    if (height > this.treeLineElevation || height < this.minElevation) {
+                        continue;
+                    }
 
-                // Skip if on steep slope (probability based)
-                const slope = this.estimateSlope(jx, jz);
-                if (slope > 0.6 && Math.random() < 0.7) {
-                    continue;
-                }
+                    // Skip if in a ski run corridor
+                    if (this.isInRunCorridor(jx, jz, runCorridors)) {
+                        continue;
+                    }
 
-                // Add tree with some random culling for variety
-                if (Math.random() > 0.15) {
+                    // Check slope - fewer trees on very steep terrain
+                    const slope = this.estimateSlope(jx, jz);
+                    if (slope > 0.7) {
+                        continue;
+                    }
+                    if (slope > 0.4 && Math.random() < 0.5) {
+                        continue;
+                    }
+
+                    // Density decreases near tree line
+                    if (height > this.treeLineElevation - 40 && Math.random() < 0.4) {
+                        continue;
+                    }
+
                     positions.push({ x: jx, y: height, z: jz });
                 }
             }
         }
 
-        console.log(`Generated ${positions.length} trees`);
         return positions;
     }
 
     /**
-     * Define corridors where ski runs are (no trees)
+     * Ski run corridors where trees are cleared
      */
     getRunCorridors() {
-        // Simplified run corridors based on main run areas
         return [
-            // Dercum frontside main corridors
-            { x: -100, z: 200, width: 80, depth: 400 },
-            { x: -60, z: 300, width: 60, depth: 300 },
-            { x: -150, z: 250, width: 50, depth: 250 },
+            // Dercum frontside - main run swath
+            { x: -80, z: 300, width: 150, depth: 500 },
+            { x: -180, z: 300, width: 80, depth: 400 },
+            { x: 0, z: 350, width: 100, depth: 350 },
 
-            // North Peak corridors
-            { x: 90, z: 0, width: 60, depth: 200 },
-            { x: 60, z: 50, width: 50, depth: 150 },
+            // North Peak runs
+            { x: 70, z: -50, width: 100, depth: 250 },
+            { x: 120, z: 0, width: 80, depth: 200 },
 
-            // Outback corridors
-            { x: 340, z: -100, width: 80, depth: 200 },
-            { x: 300, z: -50, width: 60, depth: 150 },
+            // Outback runs
+            { x: 320, z: -150, width: 120, depth: 300 },
+            { x: 280, z: -100, width: 80, depth: 200 },
 
-            // Bowl areas (sparse trees)
-            { x: -350, z: -100, width: 100, depth: 100 },
-            { x: -30, z: -250, width: 80, depth: 100 },
-            { x: 60, z: -280, width: 70, depth: 100 },
-            { x: 300, z: -300, width: 100, depth: 150 }
+            // Bowl areas (natural tree-free zones)
+            { x: -380, z: -50, width: 180, depth: 180 },
+            { x: -20, z: -350, width: 150, depth: 120 },
+            { x: 80, z: -380, width: 130, depth: 100 },
+            { x: 320, z: -380, width: 180, depth: 150 },
+
+            // Base area
+            { x: -100, z: 650, width: 400, depth: 200 }
         ];
     }
 
-    /**
-     * Check if a point is in a ski run corridor
-     */
     isInRunCorridor(x, z, corridors) {
         for (const c of corridors) {
             if (x > c.x - c.width / 2 && x < c.x + c.width / 2 &&
@@ -189,11 +216,8 @@ export class TreeGenerator {
         return false;
     }
 
-    /**
-     * Estimate slope at a point (for tree placement)
-     */
     estimateSlope(x, z) {
-        const delta = 5;
+        const delta = 4;
         const h0 = this.terrain.getHeightAt(x, z);
         const h1 = this.terrain.getHeightAt(x + delta, z);
         const h2 = this.terrain.getHeightAt(x, z + delta);

@@ -1,48 +1,58 @@
 import * as THREE from 'three';
 
 /**
- * Generates the Keystone ski resort terrain with three peaks,
- * ridge lines, and bowl depressions based on real elevation data.
+ * Generates realistic Keystone terrain matching the classic trail map perspective.
+ * Based on the 1991 James Niehues painting style.
  * 
- * Elevations (in scene units, scaled from real feet):
- * - Base: 0 (represents 9,280 ft)
- * - Summit: 313 (represents 12,408 ft)
- * - Scale: 1 unit = ~10 feet
+ * Key features from reference:
+ * - Dercum Mountain in foreground (left-center)
+ * - North Peak behind (center-right)  
+ * - The Outback further right/back
+ * - River Run village at bottom
+ * - Dense forest coverage with white ski runs cutting through
  */
 export class TerrainGenerator {
     constructor() {
-        // Terrain dimensions
-        this.width = 1600;
-        this.depth = 1200;
-        this.segments = 256;
+        // Larger terrain for more detail
+        this.width = 2000;
+        this.depth = 1600;
+        this.segments = 400; // Higher resolution
 
-        // Elevation scale (1 unit = 10 feet)
-        this.baseElevation = 0;      // 9,280 ft
-        this.maxElevation = 313;     // 12,408 ft (3,128 ft vertical)
+        // Elevation scale (matching real 3,128 ft vertical)
+        this.baseElevation = 0;
+        this.maxElevation = 350;
 
-        // Peak positions (relative to center)
+        // Keystone's actual mountain layout from trail map perspective
+        // Viewed from southeast looking northwest
         this.peaks = {
-            dercum: { x: -100, z: 100, height: 280, radius: 200 },
-            northPeak: { x: 100, z: -100, height: 313, radius: 180 },
-            outback: { x: 350, z: -200, height: 290, radius: 220 }
+            // Dercum Mountain - main frontside, prominent in foreground
+            dercumSummit: { x: -50, z: 50, height: 280, radius: 180 },
+            dercumShoulder: { x: -150, z: 150, height: 240, radius: 120 },
+
+            // North Peak - behind Dercum, highest point
+            northPeakSummit: { x: 80, z: -150, height: 350, radius: 160 },
+            northPeakRidge: { x: 0, z: -80, height: 300, radius: 140 },
+
+            // The Outback - right side, behind North Peak
+            outbackSummit: { x: 350, z: -280, height: 320, radius: 200 },
+            outbackRidge: { x: 250, z: -180, height: 280, radius: 150 },
+
+            // Independence Bowl area - far left
+            independenceRidge: { x: -400, z: -100, height: 260, radius: 180 }
         };
 
-        // Bowl positions
+        // Bowl depressions
         this.bowls = {
-            independence: { x: -350, z: -100, depth: 80, radius: 120 },
-            bergman: { x: -50, z: -280, depth: 70, radius: 100 },
-            erickson: { x: 50, z: -320, depth: 60, radius: 90 },
-            north: { x: 280, z: -350, depth: 75, radius: 110 },
-            south: { x: 380, z: -280, depth: 65, radius: 100 }
+            independence: { x: -380, z: -50, depth: 100, radius: 140 },
+            bergman: { x: -20, z: -350, depth: 90, radius: 120 },
+            erickson: { x: 80, z: -380, depth: 80, radius: 110 },
+            north: { x: 300, z: -400, depth: 95, radius: 130 },
+            south: { x: 420, z: -350, depth: 85, radius: 120 }
         };
 
-        // Heightmap for run/lift placement queries
         this.heightmap = null;
     }
 
-    /**
-     * Generate the terrain mesh
-     */
     generate() {
         const geometry = new THREE.PlaneGeometry(
             this.width,
@@ -51,277 +61,295 @@ export class TerrainGenerator {
             this.segments
         );
 
-        // Rotate to horizontal
         geometry.rotateX(-Math.PI / 2);
-
-        // Generate heightmap and apply to geometry
         this.generateHeightmap(geometry);
-
-        // Compute normals for proper lighting
         geometry.computeVertexNormals();
 
-        // Create terrain material
         const material = this.createTerrainMaterial();
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.receiveShadow = true;
+        mesh.castShadow = true;
         mesh.name = 'terrain';
 
         return mesh;
     }
 
-    /**
-     * Generate heightmap and apply to geometry vertices
-     */
     generateHeightmap(geometry) {
         const positions = geometry.attributes.position.array;
         const vertexCount = positions.length / 3;
-
-        // Create heightmap array for later queries
         this.heightmap = new Float32Array(vertexCount);
 
         for (let i = 0; i < vertexCount; i++) {
             const x = positions[i * 3];
             const z = positions[i * 3 + 2];
 
-            // Calculate height at this point
             let height = this.calculateHeight(x, z);
-
-            // Store in heightmap
             this.heightmap[i] = height;
-
-            // Apply to geometry
             positions[i * 3 + 1] = height;
         }
 
         geometry.attributes.position.needsUpdate = true;
     }
 
-    /**
-     * Calculate terrain height at a given x, z position
-     */
     calculateHeight(x, z) {
         let height = this.baseElevation;
 
-        // Add peaks using Gaussian falloff
+        // Add mountain peaks
         for (const peak of Object.values(this.peaks)) {
             const dx = x - peak.x;
             const dz = z - peak.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
-            const falloff = Math.exp(-(dist * dist) / (2 * peak.radius * peak.radius));
+
+            // Sharper peaks with exponential falloff
+            const falloff = Math.exp(-(dist * dist) / (1.8 * peak.radius * peak.radius));
             height += peak.height * falloff;
         }
 
-        // Add ridge lines between peaks
+        // Add connecting ridges for realistic mountain shape
         height += this.calculateRidges(x, z);
 
-        // Subtract bowl depressions
+        // Carve bowls
         for (const bowl of Object.values(this.bowls)) {
             const dx = x - bowl.x;
             const dz = z - bowl.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist < bowl.radius * 1.5) {
+            if (dist < bowl.radius * 1.8) {
                 const falloff = Math.exp(-(dist * dist) / (2 * bowl.radius * bowl.radius));
-                height -= bowl.depth * falloff * 0.6;
+                height -= bowl.depth * falloff * 0.7;
             }
         }
 
-        // Add Perlin-like noise for natural variation
-        height += this.noise(x, z) * 15;
+        // Add detailed noise for natural variation
+        height += this.detailedNoise(x, z);
 
-        // Ensure minimum height at edges (valley floor)
+        // Valley floor at edges
         const edgeFalloff = this.calculateEdgeFalloff(x, z);
         height *= edgeFalloff;
+
+        // Ensure base area is flat for village
+        if (z > 600) {
+            const flattenAmount = Math.min(1, (z - 600) / 150);
+            height = height * (1 - flattenAmount) + 10 * flattenAmount;
+        }
 
         return Math.max(0, height);
     }
 
-    /**
-     * Calculate ridge lines connecting the three peaks
-     */
     calculateRidges(x, z) {
         let ridgeHeight = 0;
 
-        // Ridge from Dercum to North Peak
-        ridgeHeight += this.ridgeLine(
-            x, z,
-            this.peaks.dercum.x, this.peaks.dercum.z,
-            this.peaks.northPeak.x, this.peaks.northPeak.z,
-            200, 40
-        );
+        // Main ridge: Dercum to North Peak
+        ridgeHeight += this.ridgeLine(x, z, -50, 50, 80, -150, 280, 60);
 
-        // Ridge from North Peak to Outback
-        ridgeHeight += this.ridgeLine(
-            x, z,
-            this.peaks.northPeak.x, this.peaks.northPeak.z,
-            this.peaks.outback.x, this.peaks.outback.z,
-            180, 35
-        );
+        // Ridge: North Peak to Outback
+        ridgeHeight += this.ridgeLine(x, z, 80, -150, 350, -280, 260, 50);
 
-        // Ridge from Dercum towards Independence Bowl area
-        ridgeHeight += this.ridgeLine(
-            x, z,
-            this.peaks.dercum.x, this.peaks.dercum.z,
-            -300, 0,
-            150, 30
-        );
+        // Ridge: Dercum shoulder to Independence
+        ridgeHeight += this.ridgeLine(x, z, -150, 150, -400, -100, 220, 55);
+
+        // Ridge across North Peak area
+        ridgeHeight += this.ridgeLine(x, z, 0, -80, 250, -180, 240, 45);
+
+        // Bergman/Erickson ridge
+        ridgeHeight += this.ridgeLine(x, z, -20, -350, 80, -380, 180, 40);
 
         return ridgeHeight;
     }
 
-    /**
-     * Calculate height contribution from a ridge line between two points
-     */
     ridgeLine(x, z, x1, z1, x2, z2, height, width) {
-        // Project point onto line segment
         const dx = x2 - x1;
         const dz = z2 - z1;
         const length = Math.sqrt(dx * dx + dz * dz);
 
         if (length === 0) return 0;
 
-        const t = Math.max(0, Math.min(1,
-            ((x - x1) * dx + (z - z1) * dz) / (length * length)
-        ));
-
+        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / (length * length)));
         const projX = x1 + t * dx;
         const projZ = z1 + t * dz;
+        const distToLine = Math.sqrt((x - projX) * (x - projX) + (z - projZ) * (z - projZ));
 
-        // Distance from point to line
-        const distToLine = Math.sqrt(
-            (x - projX) * (x - projX) + (z - projZ) * (z - projZ)
-        );
-
-        // Gaussian falloff from ridge line
         const falloff = Math.exp(-(distToLine * distToLine) / (2 * width * width));
-
-        // Height decreases towards endpoints
         const endFalloff = Math.sin(t * Math.PI);
 
-        return height * falloff * endFalloff * 0.4;
+        return height * falloff * endFalloff * 0.35;
     }
 
-    /**
-     * Simple noise function for terrain variation
-     */
-    noise(x, z) {
-        const scale1 = 0.01;
-        const scale2 = 0.03;
-        const scale3 = 0.08;
-
-        // Layer multiple frequencies
+    detailedNoise(x, z) {
+        // Multi-octave noise for realistic terrain detail
         let n = 0;
-        n += Math.sin(x * scale1 + 1.3) * Math.cos(z * scale1 + 0.7) * 1.0;
-        n += Math.sin(x * scale2 + 2.1) * Math.cos(z * scale2 + 1.4) * 0.5;
-        n += Math.sin(x * scale3 + 0.5) * Math.cos(z * scale3 + 2.8) * 0.25;
-
+        n += Math.sin(x * 0.008 + 1.3) * Math.cos(z * 0.008 + 0.7) * 12;
+        n += Math.sin(x * 0.02 + 2.1) * Math.cos(z * 0.02 + 1.4) * 6;
+        n += Math.sin(x * 0.05 + 0.5) * Math.cos(z * 0.05 + 2.8) * 3;
+        n += Math.sin(x * 0.12 + 3.2) * Math.cos(z * 0.12 + 0.3) * 1.5;
         return n;
     }
 
-    /**
-     * Calculate edge falloff to create valley floor at borders
-     */
     calculateEdgeFalloff(x, z) {
         const halfWidth = this.width / 2;
         const halfDepth = this.depth / 2;
-        const margin = 100;
+        const margin = 150;
 
         let falloff = 1;
 
-        // Front edge (base area)
-        if (z > halfDepth - margin) {
-            const t = (z - (halfDepth - margin)) / margin;
-            falloff *= 1 - t * 0.7;
+        // Back edge (where bowls are)
+        if (z < -halfDepth + margin * 2) {
+            const t = (z - (-halfDepth + margin * 2)) / (margin * 2);
+            falloff *= 1 + t * 0.3; // Less falloff at back
         }
 
         // Side edges
         if (Math.abs(x) > halfWidth - margin) {
             const t = (Math.abs(x) - (halfWidth - margin)) / margin;
-            falloff *= 1 - t * 0.5;
+            falloff *= 1 - t * 0.6;
         }
 
-        return Math.max(0.1, falloff);
+        return Math.max(0.05, falloff);
     }
 
-    /**
-     * Get height at any x, z position (for placing objects)
-     */
     getHeightAt(x, z) {
         return this.calculateHeight(x, z);
     }
 
     /**
-     * Create the terrain shader material with snow/forest blending
+     * Create realistic snow/forest terrain material matching trail map style
      */
     createTerrainMaterial() {
         return new THREE.ShaderMaterial({
             uniforms: {
+                // Snow colors - bright white with subtle blue shadows
                 snowColor: { value: new THREE.Color(0xffffff) },
-                forestColor: { value: new THREE.Color(0x2d4a2d) },
-                rockColor: { value: new THREE.Color(0x6b6b6b) },
-                treeLine: { value: 220 },  // ~11,500 ft
-                snowLine: { value: 180 },  // ~11,000 ft
+                snowShadow: { value: new THREE.Color(0xd0e0f0) },
+
+                // Forest colors - dark blue-green like the reference
+                forestColor: { value: new THREE.Color(0x1a3d2e) },
+                forestHighlight: { value: new THREE.Color(0x2d5a45) },
+
+                // Rock color for steep cliffs
+                rockColor: { value: new THREE.Color(0x5a5a6a) },
+
+                // Elevation thresholds
+                treeLine: { value: 260 },     // Above this = mostly snow
+                snowMix: { value: 200 },      // Snow starts appearing
+
+                // Sun direction for lighting
+                sunDirection: { value: new THREE.Vector3(0.4, 0.8, 0.3).normalize() }
             },
             vertexShader: `
         varying vec3 vPosition;
         varying vec3 vNormal;
+        varying vec3 vWorldNormal;
         varying float vHeight;
+        varying vec2 vUv;
         
         void main() {
           vPosition = position;
           vNormal = normalize(normalMatrix * normal);
+          vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
           vHeight = position.y;
+          vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
             fragmentShader: `
         uniform vec3 snowColor;
+        uniform vec3 snowShadow;
         uniform vec3 forestColor;
+        uniform vec3 forestHighlight;
         uniform vec3 rockColor;
         uniform float treeLine;
-        uniform float snowLine;
+        uniform float snowMix;
+        uniform vec3 sunDirection;
         
         varying vec3 vPosition;
         varying vec3 vNormal;
+        varying vec3 vWorldNormal;
         varying float vHeight;
+        varying vec2 vUv;
+        
+        // Simple noise for texture variation
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+        
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          
+          float a = hash(i);
+          float b = hash(i + vec2(1.0, 0.0));
+          float c = hash(i + vec2(0.0, 1.0));
+          float d = hash(i + vec2(1.0, 1.0));
+          
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
         
         void main() {
           // Calculate slope (steeper = more rock)
           float slope = 1.0 - abs(vNormal.y);
           
-          // Base color based on elevation
+          // Lighting
+          float diffuse = max(dot(vWorldNormal, sunDirection), 0.0);
+          float ambient = 0.35;
+          float light = ambient + diffuse * 0.65;
+          
+          // Add texture noise
+          float texNoise = noise(vPosition.xz * 0.1) * 0.15;
+          float fineNoise = noise(vPosition.xz * 0.4) * 0.08;
+          
           vec3 color;
           
+          // Above tree line - mostly snow with rock on steep areas
           if (vHeight > treeLine) {
-            // Above tree line: mostly snow with some rock on steep areas
-            color = mix(snowColor, rockColor, smoothstep(0.4, 0.7, slope));
-          } else if (vHeight > snowLine) {
-            // Transition zone
-            float t = (vHeight - snowLine) / (treeLine - snowLine);
-            vec3 groundColor = mix(forestColor, snowColor, slope * 0.5);
-            color = mix(groundColor, snowColor, t);
-          } else {
-            // Below snow line: forest with snow patches
-            float snowAmount = smoothstep(0.0, 0.3, slope) * 0.3;
-            color = mix(forestColor, snowColor, snowAmount + vHeight / snowLine * 0.4);
+            float rockAmount = smoothstep(0.5, 0.8, slope);
+            vec3 snow = mix(snowColor, snowShadow, 1.0 - diffuse * 0.5);
+            color = mix(snow, rockColor, rockAmount);
+            color += texNoise * 0.3;
+          }
+          // Transition zone
+          else if (vHeight > snowMix) {
+            float t = (vHeight - snowMix) / (treeLine - snowMix);
+            t = smoothstep(0.0, 1.0, t);
+            
+            // Forest with snow patches
+            vec3 forest = mix(forestColor, forestHighlight, texNoise + fineNoise);
+            vec3 snow = mix(snowColor, snowShadow, 1.0 - diffuse * 0.5);
+            
+            // More snow on gentle slopes, forest on steep
+            float snowOnSlope = 1.0 - smoothstep(0.2, 0.5, slope);
+            color = mix(forest, snow, t * snowOnSlope + slope * 0.2);
+          }
+          // Forest zone
+          else {
+            // Dense forest with variation
+            vec3 forest = mix(forestColor, forestHighlight, texNoise + fineNoise * 2.0);
+            
+            // Snow patches on gentle slopes
+            float snowPatch = smoothstep(0.3, 0.0, slope) * smoothstep(50.0, 150.0, vHeight);
+            snowPatch *= (noise(vPosition.xz * 0.05) > 0.6 ? 1.0 : 0.0);
+            
+            vec3 snow = mix(snowColor, snowShadow, 0.3);
+            color = mix(forest, snow, snowPatch * 0.4);
           }
           
-          // Add simple lighting
-          vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-          float diffuse = max(dot(vNormal, lightDir), 0.0);
-          float ambient = 0.4;
+          // Apply lighting
+          color *= light;
           
-          color *= ambient + diffuse * 0.6;
+          // Add subtle blue tint to shadows (like in the reference)
+          if (diffuse < 0.3) {
+            color = mix(color, color * vec3(0.9, 0.92, 1.05), 0.3);
+          }
           
-          // Add slight blue tint to shadowed snow areas
-          if (vHeight > snowLine && diffuse < 0.3) {
-            color = mix(color, vec3(0.8, 0.85, 1.0), 0.2);
+          // Slight warmth in lit areas
+          if (diffuse > 0.5) {
+            color = mix(color, color * vec3(1.02, 1.0, 0.98), 0.2);
           }
           
           gl_FragColor = vec4(color, 1.0);
         }
       `,
-            side: THREE.DoubleSide
+            side: THREE.FrontSide
         });
     }
 }

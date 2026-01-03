@@ -1,28 +1,26 @@
 import * as THREE from 'three';
 
 /**
- * Manages sky dome and atmospheric effects
+ * Sky dome matching the reference trail map style - 
+ * Blue sky with distant mountain backdrop
  */
 export class SkyManager {
     constructor() {
         this.isNight = false;
     }
 
-    /**
-     * Generate sky dome
-     */
     generate() {
         const group = new THREE.Group();
         group.name = 'sky';
 
-        // Sky dome
-        const skyGeometry = new THREE.SphereGeometry(2000, 32, 32);
+        // Sky dome with gradient
+        const skyGeometry = new THREE.SphereGeometry(2800, 32, 32);
         const skyMaterial = new THREE.ShaderMaterial({
             uniforms: {
-                topColor: { value: new THREE.Color(0x4a90d9) },
-                bottomColor: { value: new THREE.Color(0xb8d4f0) },
-                offset: { value: 400 },
-                exponent: { value: 0.6 }
+                topColor: { value: new THREE.Color(0x4a8bc9) },
+                bottomColor: { value: new THREE.Color(0xc8e0f0) },
+                offset: { value: 500 },
+                exponent: { value: 0.5 }
             },
             vertexShader: `
         varying vec3 vWorldPosition;
@@ -50,31 +48,29 @@ export class SkyManager {
         sky.name = 'skyDome';
         group.add(sky);
 
+        // Distant mountain range backdrop (like in the reference painting)
+        const mountains = this.createDistantMountains();
+        group.add(mountains);
+
         // Sun
-        const sunGeometry = new THREE.SphereGeometry(30, 16, 16);
-        const sunMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffee
-        });
+        const sunGeometry = new THREE.SphereGeometry(60, 16, 16);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffffee });
         const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-        sun.position.set(400, 600, 200);
+        sun.position.set(-600, 900, -400);
         sun.name = 'sun';
         group.add(sun);
 
         // Sun glow
-        const glowGeometry = new THREE.SphereGeometry(50, 16, 16);
+        const glowGeometry = new THREE.SphereGeometry(100, 16, 16);
         const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffaa,
+            color: 0xffffcc,
             transparent: true,
-            opacity: 0.3
+            opacity: 0.2
         });
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
         glow.position.copy(sun.position);
         glow.name = 'sunGlow';
         group.add(glow);
-
-        // Distant mountains silhouette
-        const mountains = this.createDistantMountains();
-        group.add(mountains);
 
         // Stars (hidden during day)
         const stars = this.createStars();
@@ -82,7 +78,6 @@ export class SkyManager {
         stars.name = 'stars';
         group.add(stars);
 
-        // Store materials for day/night switching
         group.userData.skyMaterial = skyMaterial;
         group.userData.sunMaterial = sunMaterial;
         group.userData.glowMaterial = glowMaterial;
@@ -91,53 +86,63 @@ export class SkyManager {
     }
 
     /**
-     * Create distant mountain silhouettes
+     * Create distant mountain range like in the James Niehues paintings
      */
     createDistantMountains() {
         const group = new THREE.Group();
 
+        // Blue-gray color for distant mountains (atmospheric perspective)
         const mountainMaterial = new THREE.MeshBasicMaterial({
-            color: 0x6b8cae,
+            color: 0x7899b8,
             fog: true
         });
 
-        // Create several mountain peaks on the horizon
+        const darkMountainMaterial = new THREE.MeshBasicMaterial({
+            color: 0x5577a0,
+            fog: true
+        });
+
+        // Several mountain peaks along the back horizon
         const peaks = [
-            { x: -1200, z: -800, height: 300, width: 400 },
-            { x: -800, z: -900, height: 350, width: 350 },
-            { x: -400, z: -850, height: 280, width: 300 },
-            { x: 0, z: -900, height: 320, width: 380 },
-            { x: 400, z: -850, height: 290, width: 320 },
-            { x: 800, z: -900, height: 340, width: 360 },
-            { x: 1200, z: -800, height: 310, width: 340 },
+            { x: -1800, z: -1200, height: 500, width: 600, mat: mountainMaterial },
+            { x: -1200, z: -1300, height: 600, width: 500, mat: darkMountainMaterial },
+            { x: -600, z: -1250, height: 550, width: 450, mat: mountainMaterial },
+            { x: 0, z: -1350, height: 620, width: 520, mat: darkMountainMaterial },
+            { x: 600, z: -1280, height: 580, width: 480, mat: mountainMaterial },
+            { x: 1200, z: -1320, height: 540, width: 500, mat: darkMountainMaterial },
+            { x: 1800, z: -1200, height: 500, width: 550, mat: mountainMaterial },
+
+            // Second layer (closer, slightly darker)
+            { x: -1500, z: -1000, height: 400, width: 450, mat: darkMountainMaterial },
+            { x: -900, z: -1050, height: 450, width: 400, mat: mountainMaterial },
+            { x: -300, z: -1100, height: 480, width: 420, mat: darkMountainMaterial },
+            { x: 300, z: -1080, height: 460, width: 440, mat: mountainMaterial },
+            { x: 900, z: -1020, height: 420, width: 400, mat: darkMountainMaterial },
+            { x: 1500, z: -1000, height: 400, width: 420, mat: mountainMaterial },
         ];
 
         for (const peak of peaks) {
-            const geometry = new THREE.ConeGeometry(peak.width, peak.height, 4);
-            const mountain = new THREE.Mesh(geometry, mountainMaterial);
-            mountain.position.set(peak.x, peak.height / 2, peak.z);
-            mountain.rotation.y = Math.random() * Math.PI * 2;
+            const geometry = new THREE.ConeGeometry(peak.width, peak.height, 5);
+            const mountain = new THREE.Mesh(geometry, peak.mat);
+            mountain.position.set(peak.x, peak.height / 2 + 50, peak.z);
+            mountain.rotation.y = Math.random() * Math.PI;
             group.add(mountain);
         }
 
         return group;
     }
 
-    /**
-     * Create starfield for night mode
-     */
     createStars() {
-        const starCount = 2000;
+        const starCount = 2500;
         const positions = new Float32Array(starCount * 3);
 
         for (let i = 0; i < starCount; i++) {
-            // Random position on sphere
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            const radius = 1800;
+            const radius = 2600;
 
             positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-            positions[i * 3 + 1] = Math.abs(radius * Math.cos(phi)); // Only upper hemisphere
+            positions[i * 3 + 1] = Math.abs(radius * Math.cos(phi));
             positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
         }
 
@@ -153,9 +158,6 @@ export class SkyManager {
         return new THREE.Points(geometry, material);
     }
 
-    /**
-     * Toggle between day and night
-     */
     setNightMode(sky, isNight, scene, sunLight, hemiLight, renderer) {
         this.isNight = isNight;
 
@@ -165,62 +167,51 @@ export class SkyManager {
         const sunGlow = sky.getObjectByName('sunGlow');
 
         if (isNight) {
-            // Night sky colors
             skyMaterial.uniforms.topColor.value.setHex(0x0a0a20);
             skyMaterial.uniforms.bottomColor.value.setHex(0x1a1a3a);
 
-            // Dim sun (moon)
             sun.material.color.setHex(0xccccdd);
-            sun.position.set(-300, 400, 100);
+            sun.position.set(-400, 500, 200);
             sunGlow.position.copy(sun.position);
             sunGlow.material.color.setHex(0x9999bb);
             sunGlow.material.opacity = 0.15;
 
-            // Show stars
             stars.visible = true;
 
-            // Update scene lighting
             scene.background = new THREE.Color(0x0a0a15);
-            scene.fog.color.setHex(0x1a1a2e);
+            scene.fog = new THREE.FogExp2(0x1a1a2e, 0.0003);
 
             sunLight.intensity = 0.3;
             sunLight.color.setHex(0x6677aa);
-            sunLight.position.set(-200, 300, 100);
 
             hemiLight.intensity = 0.2;
             hemiLight.color.setHex(0x2233aa);
             hemiLight.groundColor.setHex(0x1a1a2a);
 
             renderer.toneMappingExposure = 0.5;
-
         } else {
-            // Day sky colors
-            skyMaterial.uniforms.topColor.value.setHex(0x4a90d9);
-            skyMaterial.uniforms.bottomColor.value.setHex(0xb8d4f0);
+            skyMaterial.uniforms.topColor.value.setHex(0x4a8bc9);
+            skyMaterial.uniforms.bottomColor.value.setHex(0xc8e0f0);
 
-            // Bright sun
             sun.material.color.setHex(0xffffee);
-            sun.position.set(400, 600, 200);
+            sun.position.set(-600, 900, -400);
             sunGlow.position.copy(sun.position);
-            sunGlow.material.color.setHex(0xffffaa);
-            sunGlow.material.opacity = 0.3;
+            sunGlow.material.color.setHex(0xffffcc);
+            sunGlow.material.opacity = 0.2;
 
-            // Hide stars
             stars.visible = false;
 
-            // Update scene lighting
-            scene.background = new THREE.Color(0x87ceeb);
-            scene.fog.color.setHex(0x87ceeb);
+            scene.background = new THREE.Color(0x8ec8e8);
+            scene.fog = new THREE.FogExp2(0xa8d8ea, 0.0004);
 
-            sunLight.intensity = 1.2;
-            sunLight.color.setHex(0xffffff);
-            sunLight.position.set(200, 400, 200);
+            sunLight.intensity = 1.4;
+            sunLight.color.setHex(0xfffaf0);
 
             hemiLight.intensity = 0.6;
-            hemiLight.color.setHex(0x87ceeb);
-            hemiLight.groundColor.setHex(0x3d5c3d);
+            hemiLight.color.setHex(0x8ec8e8);
+            hemiLight.groundColor.setHex(0x3d5a3d);
 
-            renderer.toneMappingExposure = 1.0;
+            renderer.toneMappingExposure = 1.1;
         }
     }
 }

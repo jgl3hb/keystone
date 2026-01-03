@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { RUNS, getAllRuns, DIFFICULTY_COLORS } from './RunData.js';
+import { RUNS, getAllRuns, DIFFICULTY_COLORS, DIFFICULTY } from './RunData.js';
 
 /**
- * Renders ski runs as colored paths on the terrain
+ * Renders ski runs as wide, bright white paths cutting through the forest.
+ * Matching the classic trail map style where groomed runs are clearly visible.
  */
 export class RunRenderer {
     constructor(terrainGenerator) {
@@ -10,9 +11,6 @@ export class RunRenderer {
         this.runMeshes = new Map();
     }
 
-    /**
-     * Generate all run meshes
-     */
     generate() {
         const group = new THREE.Group();
         group.name = 'runs';
@@ -36,139 +34,149 @@ export class RunRenderer {
         return group;
     }
 
-    /**
-     * Create a mesh for a single run
-     */
     createRunMesh(run) {
         if (!run.points || run.points.length < 2) {
-            console.warn(`Run ${run.name} has insufficient points`);
             return null;
         }
 
         // Convert points to 3D with terrain height
         const points3D = run.points.map(p => {
-            const y = this.terrain.getHeightAt(p.x, p.z) + 0.5; // Slightly above terrain
+            const y = this.terrain.getHeightAt(p.x, p.z) + 0.3;
             return new THREE.Vector3(p.x, y, p.z);
         });
 
-        // Create smooth curve through points
+        // Create smooth curve
         const curve = new THREE.CatmullRomCurve3(points3D, false, 'centripetal', 0.5);
 
-        // Sample curve for tube geometry
-        const tubeSegments = Math.max(20, run.points.length * 8);
-        const radius = this.getRunWidth(run.difficulty);
+        // Get run width based on difficulty (green runs are wider)
+        const width = this.getRunWidth(run.difficulty);
 
-        // Create tube geometry for the run
-        const geometry = new THREE.TubeGeometry(curve, tubeSegments, radius, 8, false);
+        // Create ribbon geometry that follows terrain
+        const geometry = this.createRibbonGeometry(curve, width, 50);
 
-        // Get color based on difficulty
-        const color = DIFFICULTY_COLORS[run.difficulty] || 0xffffff;
-
-        // Create material with some transparency for groomed runs
+        // All runs are white/off-white like in the reference (snow-covered)
         const material = new THREE.MeshStandardMaterial({
-            color: color,
-            roughness: 0.9,
+            color: 0xf8f8ff,
+            roughness: 0.85,
             metalness: 0.0,
-            transparent: true,
-            opacity: 0.85,
             side: THREE.DoubleSide
         });
 
-        // For black diamonds, add white outline effect
-        if (run.difficulty === 'black' || run.difficulty === 'double') {
-            material.color.setHex(0xffffff);
-            material.opacity = 0.95;
-        }
-
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.name = `run_${run.id}`;
 
-        // Add run name label at top
-        this.addRunLabel(mesh, run, points3D[0]);
+        // Add colored edge markers for difficulty
+        const markers = this.createDifficultyMarkers(run, points3D);
+        mesh.add(markers);
 
         return mesh;
     }
 
     /**
-     * Get run width based on difficulty (easier = wider)
+     * Create ribbon geometry that conforms to terrain
      */
+    createRibbonGeometry(curve, width, segments) {
+        const points = curve.getPoints(segments);
+        const vertices = [];
+        const indices = [];
+        const uvs = [];
+
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i];
+
+            // Get tangent direction
+            const t = i / (points.length - 1);
+            const tangent = curve.getTangentAt(t);
+
+            // Calculate perpendicular direction (cross with up)
+            const up = new THREE.Vector3(0, 1, 0);
+            const perp = new THREE.Vector3().crossVectors(tangent, up).normalize();
+
+            // Create two vertices (left and right edge of run)
+            const halfWidth = width / 2;
+
+            const left = new THREE.Vector3(
+                p.x - perp.x * halfWidth,
+                this.terrain.getHeightAt(p.x - perp.x * halfWidth, p.z - perp.z * halfWidth) + 0.5,
+                p.z - perp.z * halfWidth
+            );
+
+            const right = new THREE.Vector3(
+                p.x + perp.x * halfWidth,
+                this.terrain.getHeightAt(p.x + perp.x * halfWidth, p.z + perp.z * halfWidth) + 0.5,
+                p.z + perp.z * halfWidth
+            );
+
+            vertices.push(left.x, left.y, left.z);
+            vertices.push(right.x, right.y, right.z);
+
+            uvs.push(0, t);
+            uvs.push(1, t);
+        }
+
+        // Create triangles
+        for (let i = 0; i < points.length - 1; i++) {
+            const v0 = i * 2;
+            const v1 = v0 + 1;
+            const v2 = v0 + 2;
+            const v3 = v0 + 3;
+
+            indices.push(v0, v2, v1);
+            indices.push(v1, v2, v3);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+
+        return geometry;
+    }
+
+    /**
+     * Create difficulty markers at the top of each run
+     */
+    createDifficultyMarkers(run, points) {
+        const group = new THREE.Group();
+
+        const color = DIFFICULTY_COLORS[run.difficulty] || 0x22c55e;
+
+        // Create marker at top of run
+        let geometry;
+        if (run.difficulty === DIFFICULTY.GREEN) {
+            geometry = new THREE.CircleGeometry(3, 16);
+        } else if (run.difficulty === DIFFICULTY.BLUE) {
+            geometry = new THREE.PlaneGeometry(5, 5);
+            geometry.rotateZ(Math.PI / 4); // Diamond
+        } else {
+            geometry = new THREE.PlaneGeometry(5, 5);
+            geometry.rotateZ(Math.PI / 4);
+        }
+
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            side: THREE.DoubleSide
+        });
+
+        const marker = new THREE.Mesh(geometry, material);
+        const topPoint = points[0];
+        marker.position.set(topPoint.x, topPoint.y + 8, topPoint.z);
+        marker.lookAt(new THREE.Vector3(topPoint.x, topPoint.y + 8, topPoint.z + 1));
+
+        group.add(marker);
+
+        return group;
+    }
+
     getRunWidth(difficulty) {
         switch (difficulty) {
-            case 'green': return 4;
-            case 'blue': return 3.5;
-            case 'black': return 3;
-            case 'double': return 2.5;
-            default: return 3;
+            case 'green': return 20;   // Wide beginner runs
+            case 'blue': return 16;
+            case 'black': return 12;
+            case 'double': return 10;  // Narrower expert runs
+            default: return 14;
         }
-    }
-
-    /**
-     * Add a text label for the run
-     */
-    addRunLabel(mesh, run, position) {
-        // Create HTML element for label
-        const div = document.createElement('div');
-        div.className = 'run-label';
-        div.textContent = run.name;
-        div.style.cssText = `
-      color: white;
-      font-family: system-ui, sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 6px;
-      background: rgba(0, 0, 0, 0.6);
-      border-radius: 3px;
-      white-space: nowrap;
-      pointer-events: none;
-    `;
-
-        // Add difficulty indicator
-        const indicator = document.createElement('span');
-        indicator.style.marginRight = '4px';
-        switch (run.difficulty) {
-            case 'green':
-                indicator.textContent = '●';
-                indicator.style.color = '#22c55e';
-                break;
-            case 'blue':
-                indicator.textContent = '■';
-                indicator.style.color = '#3b82f6';
-                break;
-            case 'black':
-                indicator.textContent = '◆';
-                indicator.style.color = '#fff';
-                break;
-            case 'double':
-                indicator.textContent = '◆◆';
-                indicator.style.color = '#fff';
-                indicator.style.fontSize = '9px';
-                break;
-        }
-        div.prepend(indicator);
-
-        // Will be converted to CSS2DObject in main.js if CSS2DRenderer is set up
-        mesh.userData.labelElement = div;
-        mesh.userData.labelPosition = position.clone().add(new THREE.Vector3(0, 10, 0));
-    }
-
-    /**
-     * Update run visibility based on difficulty filters
-     */
-    updateVisibility(showGreen, showBlue, showBlack, showDouble) {
-        this.runMeshes.forEach((mesh, id) => {
-            const difficulty = mesh.userData.difficulty;
-            let visible = false;
-
-            switch (difficulty) {
-                case 'green': visible = showGreen; break;
-                case 'blue': visible = showBlue; break;
-                case 'black': visible = showBlack; break;
-                case 'double': visible = showDouble; break;
-            }
-
-            mesh.visible = visible;
-        });
     }
 }
