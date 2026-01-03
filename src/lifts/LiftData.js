@@ -1,5 +1,5 @@
 /**
- * Lift data for Keystone - coordinates updated for new terrain scale
+ * Lift data - coordinates updated for 2400x2000 terrain
  */
 
 export const LIFT_TYPES = {
@@ -17,9 +17,9 @@ export const LIFTS = {
         type: LIFT_TYPES.GONDOLA,
         capacity: 8,
         color: 0xcc2222,
-        base: { x: -80, z: 700 },
-        summit: { x: -50, z: 60 },
-        towerCount: 16
+        base: { x: -140, z: 850 },
+        summit: { x: -100, z: -80 },
+        towerCount: 18
     },
 
     outpostGondola: {
@@ -27,9 +27,9 @@ export const LIFTS = {
         type: LIFT_TYPES.GONDOLA,
         capacity: 6,
         color: 0xcc2222,
-        base: { x: -40, z: 70 },
-        summit: { x: 80, z: -140 },
-        towerCount: 12
+        base: { x: -60, z: -60 },
+        summit: { x: 160, z: -330 },
+        towerCount: 14
     },
 
     summitExpress: {
@@ -37,9 +37,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_QUAD,
         capacity: 4,
         color: 0xcc2222,
-        base: { x: -40, z: 680 },
-        summit: { x: -30, z: 65 },
-        towerCount: 18
+        base: { x: -80, z: 820 },
+        summit: { x: -60, z: -70 },
+        towerCount: 20
     },
 
     montezumaExpress: {
@@ -47,9 +47,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_SIX,
         capacity: 6,
         color: 0xcc2222,
-        base: { x: -150, z: 450 },
-        summit: { x: -100, z: 80 },
-        towerCount: 14
+        base: { x: -260, z: 550 },
+        summit: { x: -180, z: -40 },
+        towerCount: 16
     },
 
     peruExpress: {
@@ -57,9 +57,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_SIX,
         capacity: 6,
         color: 0x22aa22,
-        base: { x: 20, z: 650 },
-        summit: { x: 40, z: 300 },
-        towerCount: 12
+        base: { x: 40, z: 800 },
+        summit: { x: 80, z: 350 },
+        towerCount: 14
     },
 
     rubyExpress: {
@@ -67,9 +67,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_SIX,
         capacity: 6,
         color: 0x2266cc,
-        base: { x: 60, z: 180 },
-        summit: { x: 50, z: -100 },
-        towerCount: 10
+        base: { x: 100, z: 220 },
+        summit: { x: 80, z: -280 },
+        towerCount: 12
     },
 
     santiagoExpress: {
@@ -77,9 +77,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_QUAD,
         capacity: 4,
         color: 0x2266cc,
-        base: { x: 120, z: 120 },
-        summit: { x: 90, z: -130 },
-        towerCount: 11
+        base: { x: 220, z: 150 },
+        summit: { x: 180, z: -320 },
+        towerCount: 13
     },
 
     outbackExpress: {
@@ -87,9 +87,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_QUAD,
         capacity: 4,
         color: 0x2266cc,
-        base: { x: 260, z: 50 },
-        summit: { x: 340, z: -260 },
-        towerCount: 14
+        base: { x: 440, z: 100 },
+        summit: { x: 580, z: -380 },
+        towerCount: 16
     },
 
     bergmanExpress: {
@@ -97,9 +97,9 @@ export const LIFTS = {
         type: LIFT_TYPES.HIGH_SPEED_QUAD,
         capacity: 4,
         color: 0xcc2222,
-        base: { x: 30, z: -60 },
-        summit: { x: -10, z: -330 },
-        towerCount: 12
+        base: { x: 60, z: -80 },
+        summit: { x: 20, z: -520 },
+        towerCount: 14
     },
 
     wayback: {
@@ -107,9 +107,9 @@ export const LIFTS = {
         type: LIFT_TYPES.QUAD,
         capacity: 4,
         color: 0x2266cc,
-        base: { x: 200, z: 100 },
-        summit: { x: 260, z: -140 },
-        towerCount: 10
+        base: { x: 360, z: 120 },
+        summit: { x: 480, z: -200 },
+        towerCount: 12
     },
 
     ranger: {
@@ -117,9 +117,9 @@ export const LIFTS = {
         type: LIFT_TYPES.TRIPLE,
         capacity: 3,
         color: 0x22aa22,
-        base: { x: -20, z: 180 },
-        summit: { x: -10, z: 70 },
-        towerCount: 7
+        base: { x: -40, z: 200 },
+        summit: { x: -20, z: -20 },
+        towerCount: 8
     },
 
     discovery: {
@@ -127,19 +127,9 @@ export const LIFTS = {
         type: LIFT_TYPES.DOUBLE,
         capacity: 2,
         color: 0x22aa22,
-        base: { x: -200, z: 620 },
-        summit: { x: -220, z: 480 },
-        towerCount: 6
-    },
-
-    a51: {
-        name: 'A-51',
-        type: LIFT_TYPES.DOUBLE,
-        capacity: 2,
-        color: 0xccaa00,
-        base: { x: -180, z: 380 },
-        summit: { x: -160, z: 220 },
-        towerCount: 6
+        base: { x: -340, z: 780 },
+        summit: { x: -380, z: 580 },
+        towerCount: 7
     }
 };
 
