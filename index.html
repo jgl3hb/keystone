@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keystone Ski Resort - 3D Map</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas"></canvas>
+    
+    <!-- Control Panel -->
+    <div id="controls">
+      <h1>KEYSTONE</h1>
+      <p class="subtitle">Colorado • 12,408 ft</p>
+      
+      <div class="control-section">
+        <h3>Layers</h3>
+        <label><input type="checkbox" id="showRuns" checked> Ski Runs</label>
+        <label><input type="checkbox" id="showLifts" checked> Lifts</label>
+        <label><input type="checkbox" id="showTrees" checked> Trees</label>
+        <label><input type="checkbox" id="showLabels" checked> Labels</label>
+      </div>
+      
+      <div class="control-section">
+        <h3>Difficulty Filter</h3>
+        <label><input type="checkbox" id="showGreen" checked> <span class="difficulty green">●</span> Beginner</label>
+        <label><input type="checkbox" id="showBlue" checked> <span class="difficulty blue">■</span> Intermediate</label>
+        <label><input type="checkbox" id="showBlack" checked> <span class="difficulty black">◆</span> Advanced</label>
+        <label><input type="checkbox" id="showDouble" checked> <span class="difficulty double">◆◆</span> Expert</label>
+      </div>
+      
+      <div class="control-section">
+        <h3>View</h3>
+        <button id="viewFront">Front View</button>
+        <button id="viewTop">Top View</button>
+        <button id="viewNorthPeak">North Peak</button>
+        <button id="viewOutback">Outback</button>
+      </div>
+      
+      <div class="control-section">
+        <h3>Time of Day</h3>
+        <div class="toggle-switch">
+          <input type="checkbox" id="nightMode">
+          <label for="nightMode">
+            <span class="day">☀️ Day</span>
+            <span class="night">🌙 Night</span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="control-section stats">
+        <h3>Resort Stats</h3>
+        <div class="stat"><span>Base:</span> 9,280 ft</div>
+        <div class="stat"><span>Summit:</span> 12,408 ft</div>
+        <div class="stat"><span>Vertical:</span> 3,128 ft</div>
+        <div class="stat"><span>Skiable:</span> 3,149 acres</div>
+        <div class="stat"><span>Runs:</span> 135+</div>
+        <div class="stat"><span>Lifts:</span> 20</div>
+      </div>
+    </div>
+    
+    <!-- Info Panel -->
+    <div id="info-panel" class="hidden">
+      <button id="close-info">×</button>
+      <h2 id="info-title">-</h2>
+      <p id="info-type">-</p>
+      <p id="info-details">-</p>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loading">
+      <div class="loader"></div>
+      <p>Loading Keystone...</p>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
